@@ -2,6 +2,7 @@ import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { StoreProvider } from '@/components/store'
+import { AdminStoreProvider } from '@/lib/admin-store'
 
 export const metadata: Metadata = {
   title: 'Mixtas — Modern essentials for a life in motion',
@@ -42,7 +43,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <StoreProvider>{children}</StoreProvider>
+        <AdminStoreProvider>
+          <StoreProvider>{children}</StoreProvider>
+        </AdminStoreProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

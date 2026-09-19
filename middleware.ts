@@ -7,16 +7,22 @@ import { createServerClient } from '@supabase/ssr'
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim()
+  const key = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim()
+
+  // If Supabase keys are not yet configured, allow request to proceed cleanly
+  if (!url || !key) {
+    return supabaseResponse
+  }
+
+  try {
+    const supabase = createServerClient(url, key, {
       cookies: {
         getAll() {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           )
           supabaseResponse = NextResponse.next({ request })
@@ -25,29 +31,31 @@ export async function middleware(request: NextRequest) {
           )
         },
       },
+    })
+
+    // Refresh session tokens
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    const isAdminRoute = request.nextUrl.pathname.startsWith('/admin')
+    const isLoginRoute = request.nextUrl.pathname === '/admin/login'
+
+    // Admin routes require a valid session (role check happens in layout/server actions)
+    if (isAdminRoute && !isLoginRoute && !user) {
+      const loginUrl = request.nextUrl.clone()
+      loginUrl.pathname = '/admin/login'
+      return NextResponse.redirect(loginUrl)
     }
-  )
 
-  // Refresh session tokens on every navigation
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const isAdminRoute = request.nextUrl.pathname.startsWith('/admin')
-  const isLoginRoute = request.nextUrl.pathname === '/admin/login'
-
-  // Admin routes require a valid session (role check happens in layout/server actions)
-  if (isAdminRoute && !isLoginRoute && !user) {
-    const loginUrl = request.nextUrl.clone()
-    loginUrl.pathname = '/admin/login'
-    return NextResponse.redirect(loginUrl)
-  }
-
-  // If user is already logged in and visits /admin/login, redirect to dashboard
-  if (isLoginRoute && user) {
-    const dashboardUrl = request.nextUrl.clone()
-    dashboardUrl.pathname = '/admin'
-    return NextResponse.redirect(dashboardUrl)
+    // If user is already logged in and visits /admin/login, redirect to dashboard
+    if (isLoginRoute && user) {
+      const dashboardUrl = request.nextUrl.clone()
+      dashboardUrl.pathname = '/admin'
+      return NextResponse.redirect(dashboardUrl)
+    }
+  } catch (error) {
+    console.error('Middleware Supabase session error:', error)
   }
 
   return supabaseResponse

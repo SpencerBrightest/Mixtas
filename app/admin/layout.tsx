@@ -50,9 +50,5 @@ function AdminContentGuard({ children }: { children: React.ReactNode }) {
 
 /** Primary layout component for the /admin section. */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <AdminStoreProvider>
-      <AdminContentGuard>{children}</AdminContentGuard>
-    </AdminStoreProvider>
-  )
+  return <AdminContentGuard>{children}</AdminContentGuard>
 }

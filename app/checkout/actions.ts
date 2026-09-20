@@ -176,6 +176,16 @@ export async function placeOrder(input: CheckoutInput) {
   revalidatePath('/admin/orders')
   revalidatePath('/admin/payments')
 
+  try {
+    const { logSupabaseActivity } = await import('@/supabase/activity-logger')
+    logSupabaseActivity('ACTION', `Order #${order.order_number || 1001} placed successfully`, {
+      orderId: order.id,
+      customerName: validated.customerName,
+      total: validated.total,
+      paymentMethod: validated.paymentMethod,
+    })
+  } catch {}
+
   return {
     ok: true,
     orderId: order.id,

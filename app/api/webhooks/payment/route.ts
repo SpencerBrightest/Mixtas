@@ -154,6 +154,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Always respond 200 OK quickly so the payment gateway doesn't retry forever
+    try {
+      const { logSupabaseActivity } = await import('@/supabase/activity-logger')
+      logSupabaseActivity('WEBHOOK', `Payment webhook processed for ${event.provider}`, {
+        providerReference: event.providerReference,
+        orderId: event.orderId,
+        status: event.status,
+        amount: event.amount,
+      })
+    } catch {}
+
     return NextResponse.json({ received: true, status: 'processed' }, { status: 200 })
   } catch (err: any) {
     console.error('Webhook error:', err)

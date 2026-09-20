@@ -32,6 +32,7 @@ export default function AdminLoginPage() {
     setTimeout(() => {
       const success = login(email, password)
       if (success) {
+        document.cookie = 'admin_authenticated=true; path=/; max-age=86400; SameSite=Lax'
         router.push('/admin')
       } else {
         setError('Invalid admin credentials. Please check your email and password.')

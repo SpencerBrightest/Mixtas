@@ -82,6 +82,7 @@ export function Topbar({ onOpenMobileMenu }: TopbarProps) {
               <button
                 onClick={() => {
                   setProfileOpen(false)
+                  document.cookie = 'admin_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
                   logout()
                 }}
                 className="w-full text-left flex items-center gap-2 px-4 py-2 text-xs text-rose-600 hover:bg-rose-50"

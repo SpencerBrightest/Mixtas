@@ -40,16 +40,17 @@ export async function middleware(request: NextRequest) {
 
     const isAdminRoute = request.nextUrl.pathname.startsWith('/admin')
     const isLoginRoute = request.nextUrl.pathname === '/admin/login'
+    const hasAdminCookie = request.cookies.get('admin_authenticated')?.value === 'true'
 
-    // Admin routes require a valid session (role check happens in layout/server actions)
-    if (isAdminRoute && !isLoginRoute && !user) {
+    // Admin routes require an active session or authenticated admin cookie
+    if (isAdminRoute && !isLoginRoute && !user && !hasAdminCookie) {
       const loginUrl = request.nextUrl.clone()
       loginUrl.pathname = '/admin/login'
       return NextResponse.redirect(loginUrl)
     }
 
     // If user is already logged in and visits /admin/login, redirect to dashboard
-    if (isLoginRoute && user) {
+    if (isLoginRoute && (user || hasAdminCookie)) {
       const dashboardUrl = request.nextUrl.clone()
       dashboardUrl.pathname = '/admin'
       return NextResponse.redirect(dashboardUrl)

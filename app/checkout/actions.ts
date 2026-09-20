@@ -1,4 +1,4 @@
-// Server actions for customer checkout, order placement, and payment initialization.
+// Server actions for customer checkout, order placement, and payment initialization with idempotency.
 
 'use server'
 
@@ -15,6 +15,7 @@ const checkoutItemSchema = z.object({
 })
 
 const checkoutSchema = z.object({
+  idempotencyKey: z.string().min(1, 'Idempotency key is required'),
   customerName: z.string().min(2, 'Name is required'),
   customerEmail: z.string().email('Valid email is required'),
   customerPhone: z.string().min(6, 'Valid phone number is required'),
@@ -28,7 +29,7 @@ const checkoutSchema = z.object({
 
 export type CheckoutInput = z.infer<typeof checkoutSchema>
 
-/** Creates a customer order and associated payment record in Supabase. */
+/** Creates an idempotent customer order and associated payment record in Supabase. */
 export async function placeOrder(input: CheckoutInput) {
   const validated = checkoutSchema.parse(input)
   const supabase = await createClient()
@@ -38,11 +39,58 @@ export async function placeOrder(input: CheckoutInput) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // 1. Insert order record
+  const userId = user?.id || null
+
+  // 1. Rate limit check: Maximum 5 pending unpaid orders per hour to prevent flood abuse
+  if (userId) {
+    const since = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    const { count: recentPending } = await supabase
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'pending')
+      .gte('created_at', since)
+
+    if ((recentPending ?? 0) >= 5) {
+      return {
+        ok: false,
+        error: 'You have several unpaid orders. Please pay an existing order or wait before creating another.',
+      }
+    }
+  }
+
+  // 2. Idempotency Check: Return existing order if identical key was already submitted
+  if (userId && validated.idempotencyKey) {
+    const { data: existing } = await supabase
+      .from('orders')
+      .select('id, order_number, total, payments(id, provider_reference, status)')
+      .eq('user_id', userId)
+      .eq('idempotency_key', validated.idempotencyKey)
+      .maybeSingle()
+
+    if (existing) {
+      if (existing.total !== validated.total) {
+        return { ok: false, error: 'Your cart changed. Please refresh and try again.' }
+      }
+      const openPayment = (existing.payments as any[])?.find(
+        (p) => p.status === 'pending' || p.status === 'successful'
+      )
+      return {
+        ok: true,
+        orderId: existing.id,
+        orderNumber: existing.order_number,
+        paymentReference: openPayment?.provider_reference,
+        total: existing.total,
+      }
+    }
+  }
+
+  // 3. Insert order record with idempotency key
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert({
-      user_id: user?.id || null,
+      user_id: userId,
+      idempotency_key: validated.idempotencyKey,
       status: 'pending',
       total: validated.total,
       currency: 'XAF',
@@ -54,12 +102,35 @@ export async function placeOrder(input: CheckoutInput) {
     .select()
     .single()
 
-  if (orderError) {
-    console.error('Order creation error:', orderError)
-    throw new Error(`Failed to place order: ${orderError.message}`)
+  // Handle unique constraint race condition if twin request won race
+  if (orderError?.code === '23505' && userId) {
+    const { data: twin } = await supabase
+      .from('orders')
+      .select('id, order_number, total, payments(id, provider_reference, status)')
+      .eq('user_id', userId)
+      .eq('idempotency_key', validated.idempotencyKey)
+      .single()
+
+    const openPayment = (twin?.payments as any[])?.find(
+      (p) => p.status === 'pending' || p.status === 'successful'
+    )
+    if (twin) {
+      return {
+        ok: true,
+        orderId: twin.id,
+        orderNumber: twin.order_number,
+        paymentReference: openPayment?.provider_reference,
+        total: twin.total,
+      }
+    }
   }
 
-  // 2. Insert order items
+  if (orderError || !order) {
+    console.error('Order creation error:', orderError)
+    return { ok: false, error: orderError?.message || 'Could not create order.' }
+  }
+
+  // 4. Insert order items
   const orderItemsData = validated.items.map((item) => ({
     order_id: order.id,
     product_id: item.productId && item.productId.length === 36 ? item.productId : null,
@@ -73,13 +144,13 @@ export async function placeOrder(input: CheckoutInput) {
     console.error('Order items error:', itemsError)
   }
 
-  // 3. Create initial payment record
+  // 5. Create initial payment record
   const reference = `MOM-${Date.now()}-${Math.floor(Math.random() * 1000)}`
   const { data: payment, error: paymentError } = await supabase
     .from('payments')
     .insert({
       order_id: order.id,
-      user_id: user?.id || null,
+      user_id: userId,
       provider: validated.paymentMethod,
       provider_reference: reference,
       amount: validated.total,
@@ -106,7 +177,7 @@ export async function placeOrder(input: CheckoutInput) {
   revalidatePath('/admin/payments')
 
   return {
-    success: true,
+    ok: true,
     orderId: order.id,
     orderNumber: order.order_number || 1001,
     paymentReference: reference,

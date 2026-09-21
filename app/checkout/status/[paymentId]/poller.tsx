@@ -39,14 +39,22 @@ export function PaymentStatusPoller({ paymentId, initialStatus }: PollerProps) {
   if (status === 'successful') {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">Payment received</h1>
-        <p className="text-[#727677]">Thank you! Your order is confirmed.</p>
-        <Link
-          href="/account/orders"
-          className="inline-flex items-center justify-center bg-[#182938] text-white text-xs uppercase tracking-wider px-5 py-2.5 rounded font-medium hover:bg-[#5d85a0] transition-colors"
-        >
-          View my orders
-        </Link>
+        <h1 className="text-2xl font-semibold text-[#182938]">Payment received</h1>
+        <p className="text-[#727677]">Thank you! Your order is confirmed and will be processed immediately.</p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+          <Link
+            href="/shop"
+            className="inline-flex items-center justify-center bg-[#182938] text-white text-xs uppercase tracking-wider px-5 py-2.5 rounded font-medium hover:bg-[#5d85a0] transition-colors"
+          >
+            Continue shopping
+          </Link>
+          <Link
+            href="/account"
+            className="inline-flex items-center justify-center border border-[#dedfdd] bg-[#f4f3f0] text-[#182938] text-xs uppercase tracking-wider px-5 py-2.5 rounded font-medium hover:bg-[#dedfdd] transition-colors"
+          >
+            View my account
+          </Link>
+        </div>
       </div>
     )
   }
@@ -54,9 +62,9 @@ export function PaymentStatusPoller({ paymentId, initialStatus }: PollerProps) {
   if (status === 'failed') {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">Payment not completed</h1>
+        <h1 className="text-2xl font-semibold text-rose-700">Payment not completed</h1>
         <p className="text-[#727677]">
-          The payment failed, was cancelled or expired. You were not charged for this attempt.
+          The payment failed, was cancelled, or expired. You were not charged for this attempt.
         </p>
         <Link
           href="/checkout"
@@ -84,7 +92,7 @@ export function PaymentStatusPoller({ paymentId, initialStatus }: PollerProps) {
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Confirming your payment...</h1>
       <p className="text-[#727677]">
-        Please wait and <strong>do not pay again</strong>. This page updates automatically.
+        Please approve the prompt on your phone and <strong>do not pay again</strong>. This page updates automatically.
       </p>
       {timedOut && (
         <div className="space-y-3">
@@ -93,10 +101,10 @@ export function PaymentStatusPoller({ paymentId, initialStatus }: PollerProps) {
             show in My Orders shortly. Do not pay a second time.
           </p>
           <Link
-            href="/account/orders"
+            href="/account"
             className="inline-flex items-center justify-center border border-[#dedfdd] bg-[#f4f3f0] text-[#182938] text-xs uppercase tracking-wider px-5 py-2.5 rounded font-medium hover:bg-[#dedfdd] transition-colors"
           >
-            Go to my orders
+            Go to my account
           </Link>
         </div>
       )}

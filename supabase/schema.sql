@@ -122,10 +122,12 @@ create table if not exists public.payments (
   raw_payload jsonb,
   confirmed_by uuid references public.profiles(id),
   confirmed_at timestamptz,
+  note text,
   created_at timestamptz not null default now()
 );
 
 alter table public.payments add column if not exists checkout_url text;
+alter table public.payments add column if not exists note text;
 
 create unique index if not exists payments_one_open_per_order
   on public.payments(order_id)
@@ -172,6 +174,7 @@ create policy "orders_insert_own" on public.orders for insert with check (user_i
 create policy "orders_admin_update" on public.orders for update using (public.is_admin());
 
 create policy "payments_select_own_or_admin" on public.payments for select using (user_id = auth.uid() or public.is_admin());
+create policy "payments_insert_own" on public.payments for insert with check (user_id = auth.uid() or user_id is null);
 create policy "payments_admin_update" on public.payments for update using (public.is_admin());
 
 create policy "audit_admin_read" on public.admin_audit_log for select using (public.is_admin());

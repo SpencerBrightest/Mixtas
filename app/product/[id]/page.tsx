@@ -130,7 +130,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               </details>
               <details>
                 <summary>Shipping & returns</summary>
-                <p>Complimentary shipping over $150. Returns accepted within 30 days.</p>
+                <p>Complimentary shipping over 50 000 FCFA. Returns accepted within 30 days.</p>
               </details>
             </div>
           </div>

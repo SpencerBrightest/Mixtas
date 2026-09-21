@@ -4,7 +4,7 @@
 
 import Link from 'next/link'
 import React, { useState } from 'react'
-import { ArrowRight, Check, Mail, Heart, Trash2, ShieldCheck, CheckCircle2, Phone, CreditCard, ShoppingBag } from 'lucide-react'
+import { ArrowRight, Check, Mail, Heart, Trash2, ShieldCheck, CheckCircle2, Phone, Smartphone, ShoppingBag } from 'lucide-react'
 import { Footer, ProductGrid, SiteHeader, Quantity, useStore } from '@/components/store'
 import { blogPosts, money, products } from '@/lib/catalog'
 import { placeOrder } from '@/app/checkout/actions'
@@ -15,6 +15,7 @@ import { useAdminStore } from '@/lib/admin-store'
 export function CartPage() {
   const { cart, removeFromCart, updateQuantity } = useStore()
   const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+  const shippingFee = subtotal >= 50000 || subtotal === 0 ? 0 : 2500
 
   return (
     <>
@@ -23,7 +24,7 @@ export function CartPage() {
         <div className="page-intro left">
           <p className="eyebrow">Your selection</p>
           <h1>Shopping bag</h1>
-          <p>{cart.length} items &middot; Complimentary shipping over $150</p>
+          <p>{cart.length} items &middot; Complimentary shipping over 50 000 FCFA</p>
         </div>
 
         <div className="cart-layout">
@@ -65,16 +66,16 @@ export function CartPage() {
             </div>
             <div>
               <span>Shipping</span>
-              <strong>{subtotal >= 150 || subtotal === 0 ? 'Free' : '$12.00'}</strong>
+              <strong>{shippingFee === 0 ? 'Free' : money(shippingFee)}</strong>
             </div>
             <div className="summary-total">
               <span>Total</span>
-              <strong>{money(subtotal >= 150 || subtotal === 0 ? subtotal : subtotal + 12)}</strong>
+              <strong>{money(subtotal + shippingFee)}</strong>
             </div>
             <Link href={cart.length ? '/checkout' : '/shop'} className="button button-dark full">
               {cart.length ? 'Proceed to Checkout' : 'Continue shopping'} <ArrowRight size={15} />
             </Link>
-            <p className="secure-note">Secure checkout &middot; Visa &middot; Mastercard &middot; Mobile money</p>
+            <p className="secure-note">Instant Mobile Money &middot; MTN MoMo &middot; Orange Money</p>
           </aside>
         </div>
       </main>
@@ -83,11 +84,11 @@ export function CartPage() {
   )
 }
 
-/** Renders the checkout checkout form with contact, address, payment method selection, and order placement. */
+/** Renders the checkout form with contact, shipping address, Mobile Money authorization, and automated order placement. */
 export function CheckoutPage() {
   const { cart, clearCart } = useStore()
 
-  const [method, setMethod] = useState<'mtn_momo' | 'orange_money' | 'card' | 'paypal'>('mtn_momo')
+  const [method, setMethod] = useState<'mtn_momo' | 'orange_money'>('mtn_momo')
   const [email, setEmail] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -99,37 +100,35 @@ export function CheckoutPage() {
   const [momoNumber, setMomoNumber] = useState('')
 
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [orderConfirmed, setOrderConfirmed] = useState<{
-    orderNumber: number | string
-    total: number
-    paymentReference: string
-    authorizationUrl?: string
-  } | null>(null)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
   const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
-  const shippingFee = subtotal >= 150 || subtotal === 0 ? 0 : 12
+  const shippingFee = subtotal >= 50000 || subtotal === 0 ? 0 : 2500
   const total = subtotal + shippingFee
 
-  // Handles order submission: creates order, initializes Notch Pay, then redirects to payment page
+  // Handles order placement and initiates Notch Pay Mobile Money transaction
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!cart.length || isSubmitting) return
 
     setIsSubmitting(true)
+    setCheckoutError(null)
 
     const customerFullName = `${firstName} ${lastName}`.trim()
     const fullAddress = `${address}, ${city}, ${state} ${zip}`.trim()
+    const activePhone = momoNumber || phone
 
     try {
       const result = await placeOrder({
         idempotencyKey: crypto.randomUUID(),
         customerName: customerFullName,
         customerEmail: email,
-        customerPhone: phone || momoNumber,
+        customerPhone: activePhone,
         customerAddress: fullAddress,
         city,
         provider: 'notchpay',
-        momoNumber: momoNumber || undefined,
+        paymentMethod: method === 'orange_money' ? 'Orange Money' : 'MTN Mobile Money',
+        momoNumber: activePhone,
         items: cart.map((c) => ({
           productId: c.product.id,
           name: c.product.name,
@@ -141,94 +140,33 @@ export function CheckoutPage() {
       })
 
       if (!result.ok) {
-        console.error('Order placement failed:', result.error)
+        setCheckoutError(result.error || 'Could not place your order. Please try again.')
         setIsSubmitting(false)
         return
       }
 
-      // paymentId is required to initialize Notch Pay authorization URL
       if (!result.paymentId) {
-        console.error('No payment record returned from placeOrder')
+        setCheckoutError('Payment record could not be created. Please try again.')
         setIsSubmitting(false)
         return
       }
 
+      // Initialize Notch Pay transaction and retrieve the authorization URL
       const started = await startNotchPayment(result.paymentId)
       if (!started.ok) {
-        console.error('Notch Pay start failed:', started.error)
+        setCheckoutError(started.error || 'Could not initialize Mobile Money payment. Please check your phone number and try again.')
         setIsSubmitting(false)
         return
       }
 
-      // Clear cart and redirect to Notch Pay hosted payment page
+      // Clear cart and redirect customer to the Notch Pay Mobile Money prompt page
       clearCart()
       window.location.href = started.url
-    } catch (err) {
+    } catch (err: any) {
       console.error('Checkout error:', err)
+      setCheckoutError(err?.message || 'An unexpected error occurred. Please try again.')
       setIsSubmitting(false)
     }
-  }
-
-  // If order was placed, display dedicated confirmation screen
-  if (orderConfirmed) {
-    return (
-      <>
-        <SiteHeader />
-        <main className="page-shell narrow">
-          <div className="bg-white p-8 sm:p-12 rounded-xl border border-[#dedfdd] text-center max-w-xl mx-auto my-12 shadow-sm space-y-6">
-            <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-200">
-              <CheckCircle2 size={36} />
-            </div>
-
-            <div>
-              <p className="text-xs uppercase tracking-widest text-[#5d85a0] font-semibold">Thank You For Your Order</p>
-              <h1 className="font-serif text-3xl text-[#182938] mt-1">Order #{orderConfirmed.orderNumber} Confirmed</h1>
-              <p className="text-xs text-[#727677] mt-2">
-                We have received your order request. A confirmation and payment prompt will be dispatched to your contact details.
-              </p>
-            </div>
-
-            <div className="p-4 bg-[#f4f3f0] rounded-lg border border-[#dedfdd] text-left text-xs space-y-2">
-              <div className="flex justify-between">
-                <span className="text-[#727677]">Transaction Reference:</span>
-                <span className="font-mono font-medium text-[#182938]">{orderConfirmed.paymentReference}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#727677]">Payment Method:</span>
-                <span className="capitalize font-medium text-[#182938]">{method.replace('_', ' ')}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#727677]">Total Amount:</span>
-                <span className="font-bold text-[#182938] font-serif">${orderConfirmed.total.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#727677]">Status:</span>
-                <span className="text-amber-700 bg-amber-100 px-2 py-0.5 rounded font-semibold text-[10px]">Payment Pending</span>
-              </div>
-            </div>
-
-            {method.includes('momo') && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center gap-2 text-left">
-                <Phone size={18} className="flex-shrink-0" />
-                <span>
-                  Please check your phone (<strong>{momoNumber || phone}</strong>) and approve the Mobile Money prompt to finalize your transfer.
-                </span>
-              </div>
-            )}
-
-            <div className="flex flex-col sm:flex-row gap-3 pt-4">
-              <Link href="/shop" className="button button-dark flex-1">
-                Continue Shopping <ArrowRight size={15} />
-              </Link>
-              <Link href="/account" className="outline-button flex-1">
-                View My Account
-              </Link>
-            </div>
-          </div>
-        </main>
-        <Footer />
-      </>
-    )
   }
 
   return (
@@ -321,7 +259,7 @@ export function CheckoutPage() {
                   <span className="payment-logo bg-amber-400 text-black font-bold">M</span>
                   <span>
                     <strong>MTN Mobile Money</strong>
-                    <small>Instant push prompt on your phone</small>
+                    <small>Instant PIN prompt on your phone</small>
                   </span>
                   <span className="payment-radio" />
                 </button>
@@ -334,53 +272,27 @@ export function CheckoutPage() {
                   <span className="payment-logo bg-orange-500 text-white font-bold">O</span>
                   <span>
                     <strong>Orange Money</strong>
-                    <small>Fast wallet payment authorization</small>
-                  </span>
-                  <span className="payment-radio" />
-                </button>
-
-                <button
-                  type="button"
-                  className={method === 'card' ? 'payment-option active' : 'payment-option'}
-                  onClick={() => setMethod('card')}
-                >
-                  <span className="payment-logo card-logo">▣</span>
-                  <span>
-                    <strong>Card payment</strong>
-                    <small>Visa, Mastercard, or Amex</small>
+                    <small>Instant PIN prompt on your phone</small>
                   </span>
                   <span className="payment-radio" />
                 </button>
               </div>
 
-              {method.includes('momo') || method === 'orange_money' ? (
-                <div className="mobile-money-fields">
-                  <label>
-                    Mobile Money Number
-                    <input
-                      placeholder="e.g. 670 000 000"
-                      type="tel"
-                      required
-                      value={momoNumber}
-                      onChange={(e) => setMomoNumber(e.target.value)}
-                    />
-                  </label>
-                  <p className="text-[11px] text-[#727677]">
-                    A secure USSD payment prompt will be sent directly to this number upon placing your order.
-                  </p>
-                </div>
-              ) : (
-                <div className="mobile-money-fields">
-                  <label>
-                    Card number
-                    <input placeholder="1234 5678 9012 3456" inputMode="numeric" required />
-                  </label>
-                  <div className="input-grid">
-                    <input placeholder="MM / YY" required />
-                    <input placeholder="CVC" required />
-                  </div>
-                </div>
-              )}
+              <div className="mobile-money-fields">
+                <label>
+                  Mobile Money Phone Number
+                  <input
+                    placeholder="e.g. 677 000 000"
+                    type="tel"
+                    required
+                    value={momoNumber}
+                    onChange={(e) => setMomoNumber(e.target.value)}
+                  />
+                </label>
+                <p className="text-[11px] text-[#727677]">
+                  An automated payment notification will be dispatched to this phone. Simply enter your Mobile Money PIN to approve.
+                </p>
+              </div>
             </div>
 
             <button
@@ -388,8 +300,15 @@ export function CheckoutPage() {
               type="submit"
               disabled={isSubmitting || !cart.length}
             >
-              {isSubmitting ? 'Processing Order...' : `Place Order · ${money(total)}`} <ArrowRight size={15} />
+              {isSubmitting ? 'Connecting to Mobile Money...' : `Pay ${money(total)}`} <ArrowRight size={15} />
             </button>
+
+            {/* Show payment/order error to user */}
+            {checkoutError && (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mt-2">
+                {checkoutError}
+              </p>
+            )}
           </form>
 
           {/* Order Summary Sidebar */}
@@ -519,7 +438,7 @@ export function AccountPage() {
                       <p className="text-[11px] text-[#727677] mt-1">{ord.customerAddress}</p>
                     </div>
                     <div className="text-right">
-                      <span className="font-serif font-bold text-[#182938]">${ord.total.toFixed(2)}</span>
+                      <span className="font-serif font-bold text-[#182938]">{money(ord.total)}</span>
                     </div>
                   </div>
                 ))}

@@ -1,13 +1,13 @@
 // Utility functions for currency, date, and text formatting across the application.
 
-/** Formats an integer amount as XAF currency string with space grouping. */
+/** Formats an integer amount as FCFA currency string with space grouping. */
 export function formatPrice(amount: number): string {
   if (isNaN(amount) || amount === null || amount === undefined) {
-    return '0 XAF'
+    return '0 FCFA'
   }
-  // Group thousands with space according to local XAF formatting standard
+  // Group thousands with space according to local FCFA formatting standard
   const formatted = Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
-  return `${formatted} XAF`
+  return `${formatted} FCFA`
 }
 
 /** Formats an ISO date string into a readable date format. */

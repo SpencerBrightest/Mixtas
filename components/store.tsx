@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Heart, Menu, Minus, Plus, Search, ShoppingBag, UserRound, X } from 'lucide-react'
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
 import { categories, heroImage, initialCart, money, navItems, Product, products, type CartItem } from '@/lib/catalog'
@@ -25,7 +25,7 @@ export function SiteHeader() {
   const pathname = usePathname()
   const { cart, wishlist } = useStore()
   return <>
-    <div className="announcement">Complimentary shipping on orders over $150 <span>•</span> Easy returns within 30 days</div>
+    <div className="announcement">Complimentary shipping on orders over 50 000 FCFA <span>•</span> Easy returns within 30 days</div>
     <header className="site-header">
       <button className="icon-button mobile-only" aria-label="Open menu" onClick={() => setOpen(true)}><Menu size={20} /></button>
       <nav className="desktop-nav">{navItems.map((item) => <Link key={item.href} href={item.href} className={pathname.startsWith(item.href) ? 'active' : ''}>{item.label}</Link>)}</nav>
@@ -40,7 +40,45 @@ export function Footer() { return <footer className="site-footer"><div><Link hre
 
 export function ProductCard({ product }: { product: Product }) { const { wishlist, toggleWishlist } = useStore(); const liked = wishlist.includes(product.id); return <article className="product-card"><div className="product-image-wrap"><Link href={`/product/${product.id}`}><img src={product.image} alt={product.name} /></Link><button className={`wish-button ${liked ? 'liked' : ''}`} onClick={() => toggleWishlist(product.id)} aria-label={liked ? 'Remove from wishlist' : 'Add to wishlist'}><Heart size={17} fill={liked ? 'currentColor' : 'none'} /></button>{product.badge && <span className="product-badge">{product.badge}</span>}</div><div className="product-info"><p className="eyebrow">{product.category}</p><Link href={`/product/${product.id}`} className="product-name">{product.name}</Link><p className="product-price">{money(product.price)}</p></div></article> }
 
-export function ProductActions({ product }: { product: Product }) { const { addToCart, wishlist, toggleWishlist } = useStore(); const [size, setSize] = useState(product.sizes?.[0]); const liked = wishlist.includes(product.id); return <><div className="option"><label>Size <Link href="#size-guide">Size guide</Link></label><div className="size-grid">{product.sizes?.map((item) => <button key={item} className={size === item ? 'selected' : ''} onClick={() => setSize(item)}>{item}</button>)}</div></div><div className="detail-actions"><button className="button button-dark" onClick={() => addToCart(product, size)}>Add to bag <ArrowRight size={15} /></button><button className={`outline-button ${liked ? 'liked' : ''}`} onClick={() => toggleWishlist(product.id)} aria-label={liked ? 'Remove from wishlist' : 'Add to wishlist'}><Heart size={17} fill={liked ? 'currentColor' : 'none'} /></button></div></> }
+// Handles selecting size, adding item to cart, and redirecting directly to the cart page
+export function ProductActions({ product }: { product: Product }) {
+  const { addToCart, wishlist, toggleWishlist } = useStore()
+  const router = useRouter()
+  const [size, setSize] = useState(product.sizes?.[0])
+  const liked = wishlist.includes(product.id)
+
+  const handleAddToCart = () => {
+    addToCart(product, size)
+    router.push('/cart')
+  }
+
+  return (
+    <>
+      <div className="option">
+        <label>Size <Link href="#size-guide">Size guide</Link></label>
+        <div className="size-grid">
+          {product.sizes?.map((item) => (
+            <button key={item} className={size === item ? 'selected' : ''} onClick={() => setSize(item)}>
+              {item}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="detail-actions">
+        <button className="button button-dark" onClick={handleAddToCart}>
+          Add to bag <ArrowRight size={15} />
+        </button>
+        <button
+          className={`outline-button ${liked ? 'liked' : ''}`}
+          onClick={() => toggleWishlist(product.id)}
+          aria-label={liked ? 'Remove from wishlist' : 'Add to wishlist'}
+        >
+          <Heart size={17} fill={liked ? 'currentColor' : 'none'} />
+        </button>
+      </div>
+    </>
+  )
+}
 
 export function ProductGrid({ items = products }: { items?: Product[] }) { return <div className="product-grid">{items.map((product) => <ProductCard key={product.id} product={product} />)}</div> }
 

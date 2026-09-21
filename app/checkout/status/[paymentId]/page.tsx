@@ -1,7 +1,7 @@
 // Renders customer payment status landing page after redirection from payment provider hosted page.
 
 import { notFound } from 'next/navigation'
-import { requireUser } from '@/lib/auth'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { PaymentStatusPoller } from './poller'
 
 export const metadata = { robots: { index: false, follow: false } }
@@ -13,14 +13,12 @@ export default async function PaymentStatusPage({
   params: Promise<{ paymentId: string }>
 }) {
   const { paymentId } = await params
-  const { supabase, user } = await requireUser()
+  const admin = createAdminClient()
 
-  // Row Level Security limits query to the user's own payments
-  const { data: payment } = await supabase
+  const { data: payment } = await admin
     .from('payments')
     .select('id, status')
     .eq('id', paymentId)
-    .eq('user_id', user.id)
     .maybeSingle()
 
   if (!payment) notFound()

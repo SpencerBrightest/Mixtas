@@ -8,6 +8,7 @@ import { ArrowRight, Check, Mail, Heart, Trash2, ShieldCheck, CheckCircle2, Phon
 import { Footer, ProductGrid, SiteHeader, Quantity, useStore } from '@/components/store'
 import { blogPosts, money, products } from '@/lib/catalog'
 import { placeOrder } from '@/app/checkout/actions'
+import { startNotchPayment } from '@/app/checkout/notchpay-actions'
 import { useAdminStore } from '@/lib/admin-store'
 
 /** Renders the shopping bag view with item quantity management and subtotal calculations. */
@@ -85,7 +86,6 @@ export function CartPage() {
 /** Renders the checkout checkout form with contact, address, payment method selection, and order placement. */
 export function CheckoutPage() {
   const { cart, clearCart } = useStore()
-  const { addOrder, addPayment } = useAdminStore()
 
   const [method, setMethod] = useState<'mtn_momo' | 'orange_money' | 'card' | 'paypal'>('mtn_momo')
   const [email, setEmail] = useState('')
@@ -103,16 +103,17 @@ export function CheckoutPage() {
     orderNumber: number | string
     total: number
     paymentReference: string
+    authorizationUrl?: string
   } | null>(null)
 
   const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
   const shippingFee = subtotal >= 150 || subtotal === 0 ? 0 : 12
   const total = subtotal + shippingFee
 
-  // Handles order submission and synchronization with backend
+  // Handles order submission: creates order, initializes Notch Pay, then redirects to payment page
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!cart.length) return
+    if (!cart.length || isSubmitting) return
 
     setIsSubmitting(true)
 
@@ -120,15 +121,15 @@ export function CheckoutPage() {
     const fullAddress = `${address}, ${city}, ${state} ${zip}`.trim()
 
     try {
-      // Attempt backend order creation via server action
       const result = await placeOrder({
+        idempotencyKey: crypto.randomUUID(),
         customerName: customerFullName,
         customerEmail: email,
         customerPhone: phone || momoNumber,
         customerAddress: fullAddress,
         city,
-        paymentMethod: method,
-        momoNumber: method.includes('momo') ? momoNumber : undefined,
+        provider: 'notchpay',
+        momoNumber: momoNumber || undefined,
         items: cart.map((c) => ({
           productId: c.product.id,
           name: c.product.name,
@@ -139,90 +140,31 @@ export function CheckoutPage() {
         total,
       })
 
-      // Also sync to client admin store for immediate interactive dashboard preview
-      const localOrderNum = result.orderNumber || Math.floor(1000 + Math.random() * 9000)
-      const localOrderId = result.orderId || `ord-${Date.now()}`
+      if (!result.ok) {
+        console.error('Order placement failed:', result.error)
+        setIsSubmitting(false)
+        return
+      }
 
-      addOrder({
-        orderNumber: typeof localOrderNum === 'number' ? localOrderNum : Number(localOrderNum),
-        customerName: customerFullName,
-        customerPhone: phone || momoNumber,
-        customerAddress: fullAddress,
-        status: 'pending',
-        total,
-        currency: 'XAF',
-        items: cart.map((c, i) => ({
-          id: `item-${Date.now()}-${i}`,
-          orderId: localOrderId,
-          productName: c.size ? `${c.product.name} (Size ${c.size})` : c.product.name,
-          unitPrice: c.product.price,
-          quantity: c.quantity,
-        })),
-      })
+      // paymentId is required to initialize Notch Pay authorization URL
+      if (!result.paymentId) {
+        console.error('No payment record returned from placeOrder')
+        setIsSubmitting(false)
+        return
+      }
 
-      addPayment({
-        orderId: localOrderId,
-        orderNumber: typeof localOrderNum === 'number' ? localOrderNum : Number(localOrderNum),
-        provider: method,
-        providerReference: result.paymentReference || `REF-${Date.now()}`,
-        amount: total,
-        currency: 'XAF',
-        status: 'pending',
-        payerPhone: momoNumber || phone,
-        payerName: customerFullName,
-      })
+      const started = await startNotchPayment(result.paymentId)
+      if (!started.ok) {
+        console.error('Notch Pay start failed:', started.error)
+        setIsSubmitting(false)
+        return
+      }
 
-      setOrderConfirmed({
-        orderNumber: localOrderNum,
-        total,
-        paymentReference: result.paymentReference,
-      })
-
+      // Clear cart and redirect to Notch Pay hosted payment page
       clearCart()
+      window.location.href = started.url
     } catch (err) {
-      console.warn('Backend server action notice, fallback client sync:', err)
-      // Client-side fallback if database is in setup phase
-      const fallbackNum = Math.floor(1000 + Math.random() * 9000)
-      const fallbackRef = `MOM-${Date.now()}`
-      const fallbackId = `ord-${Date.now()}`
-
-      addOrder({
-        orderNumber: fallbackNum,
-        customerName: customerFullName,
-        customerPhone: phone || momoNumber,
-        customerAddress: fullAddress,
-        status: 'pending',
-        total,
-        currency: 'XAF',
-        items: cart.map((c, i) => ({
-          id: `item-${Date.now()}-${i}`,
-          orderId: fallbackId,
-          productName: c.size ? `${c.product.name} (Size ${c.size})` : c.product.name,
-          unitPrice: c.product.price,
-          quantity: c.quantity,
-        })),
-      })
-
-      addPayment({
-        orderId: fallbackId,
-        orderNumber: fallbackNum,
-        provider: method,
-        providerReference: fallbackRef,
-        amount: total,
-        currency: 'XAF',
-        status: 'pending',
-        payerPhone: momoNumber || phone,
-        payerName: customerFullName,
-      })
-
-      setOrderConfirmed({
-        orderNumber: fallbackNum,
-        total,
-        paymentReference: fallbackRef,
-      })
-
-      clearCart()
-    } finally {
+      console.error('Checkout error:', err)
       setIsSubmitting(false)
     }
   }

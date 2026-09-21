@@ -28,3 +28,18 @@ export async function requireAdmin() {
 
   return { user, profile }
 }
+
+/** Verifies that the current user has an active session and returns the user object and supabase client. */
+export async function requireUser() {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error('Authentication required')
+  }
+
+  return { supabase, user }
+}

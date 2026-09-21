@@ -61,8 +61,8 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
           <p className="text-xs text-[#727677] mt-1">Processed on {formatDateTime(payment.createdAt)}</p>
         </div>
 
-        {/* Manual Mark as Successful button */}
-        {payment.status === 'pending' && (
+        {/* Manual Mark as Successful button — only for manual provider payments */}
+        {payment.status === 'pending' && payment.provider === 'manual' && (
           <button
             onClick={() => setConfirmModalOpen(true)}
             className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs uppercase tracking-wider px-4 py-2.5 rounded font-medium transition-colors shadow-xs"

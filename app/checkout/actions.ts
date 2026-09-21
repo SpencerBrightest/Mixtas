@@ -1,4 +1,4 @@
-// Server actions for customer checkout, order placement, and payment initialization with idempotency.
+// Server actions for customer checkout, order placement, and payment record creation.
 
 'use server'
 
@@ -15,13 +15,14 @@ const checkoutItemSchema = z.object({
 })
 
 const checkoutSchema = z.object({
-  idempotencyKey: z.string().min(1, 'Idempotency key is required'),
+  idempotencyKey: z.string().optional().default(() => crypto.randomUUID()),
   customerName: z.string().min(2, 'Name is required'),
   customerEmail: z.string().email('Valid email is required'),
   customerPhone: z.string().min(6, 'Valid phone number is required'),
   customerAddress: z.string().min(3, 'Address is required'),
   city: z.string().optional(),
-  paymentMethod: z.enum(['mtn_momo', 'orange_money', 'card', 'cash_on_delivery', 'paypal']),
+  provider: z.enum(['manual', 'notchpay']).default('notchpay'),
+  paymentMethod: z.string().optional(),
   momoNumber: z.string().optional(),
   items: z.array(checkoutItemSchema).min(1, 'Cart cannot be empty'),
   total: z.number().int().nonnegative(),
@@ -29,7 +30,7 @@ const checkoutSchema = z.object({
 
 export type CheckoutInput = z.infer<typeof checkoutSchema>
 
-/** Creates an idempotent customer order and associated payment record in Supabase. */
+/** Creates an idempotent customer order and associated pending payment record in Supabase. */
 export async function placeOrder(input: CheckoutInput) {
   const validated = checkoutSchema.parse(input)
   const supabase = await createClient()
@@ -79,7 +80,7 @@ export async function placeOrder(input: CheckoutInput) {
         ok: true,
         orderId: existing.id,
         orderNumber: existing.order_number,
-        paymentReference: openPayment?.provider_reference,
+        paymentId: openPayment?.id,
         total: existing.total,
       }
     }
@@ -97,7 +98,7 @@ export async function placeOrder(input: CheckoutInput) {
       customer_name: validated.customerName,
       customer_phone: validated.customerPhone,
       customer_address: `${validated.customerAddress}${validated.city ? `, ${validated.city}` : ''}`,
-      notes: `Email: ${validated.customerEmail} | Payment: ${validated.paymentMethod}`,
+      notes: `Email: ${validated.customerEmail} | Payment Provider: ${validated.provider}`,
     })
     .select()
     .single()
@@ -119,7 +120,7 @@ export async function placeOrder(input: CheckoutInput) {
         ok: true,
         orderId: twin.id,
         orderNumber: twin.order_number,
-        paymentReference: openPayment?.provider_reference,
+        paymentId: openPayment?.id,
         total: twin.total,
       }
     }
@@ -144,53 +145,40 @@ export async function placeOrder(input: CheckoutInput) {
     console.error('Order items error:', itemsError)
   }
 
-  // 5. Create initial payment record
-  const reference = `MOM-${Date.now()}-${Math.floor(Math.random() * 1000)}`
-  const { data: payment, error: paymentError } = await supabase
+  // 5. Create initial payment row for Notch Pay or manual payment
+  const { data: paymentRecord, error: paymentError } = await supabase
     .from('payments')
     .insert({
       order_id: order.id,
       user_id: userId,
-      provider: validated.paymentMethod,
-      provider_reference: reference,
+      provider: validated.provider,
       amount: validated.total,
       currency: 'XAF',
       status: 'pending',
       payer_phone: validated.momoNumber || validated.customerPhone,
       payer_name: validated.customerName,
       raw_payload: {
-        channel: validated.paymentMethod,
         email: validated.customerEmail,
         placedAt: new Date().toISOString(),
       },
     })
-    .select()
+    .select('id')
     .single()
 
   if (paymentError) {
     console.error('Payment record error:', paymentError)
   }
 
-  // Revalidate dashboard routes
+  // Revalidate admin dashboard monitoring paths
   revalidatePath('/admin')
   revalidatePath('/admin/orders')
   revalidatePath('/admin/payments')
-
-  try {
-    const { logSupabaseActivity } = await import('@/supabase/activity-logger')
-    logSupabaseActivity('ACTION', `Order #${order.order_number || 1001} placed successfully`, {
-      orderId: order.id,
-      customerName: validated.customerName,
-      total: validated.total,
-      paymentMethod: validated.paymentMethod,
-    })
-  } catch {}
 
   return {
     ok: true,
     orderId: order.id,
     orderNumber: order.order_number || 1001,
-    paymentReference: reference,
+    paymentId: paymentRecord?.id,
     total: validated.total,
   }
 }

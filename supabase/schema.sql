@@ -112,6 +112,7 @@ create table if not exists public.payments (
   user_id uuid references public.profiles(id) on delete set null,
   provider text not null,
   provider_reference text unique,
+  checkout_url text,
   amount integer not null check (amount >= 0),
   currency text not null default 'XAF',
   status text not null default 'pending'
@@ -123,6 +124,8 @@ create table if not exists public.payments (
   confirmed_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+alter table public.payments add column if not exists checkout_url text;
 
 create unique index if not exists payments_one_open_per_order
   on public.payments(order_id)

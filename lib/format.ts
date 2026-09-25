@@ -14,6 +14,7 @@ export function formatPrice(amount: number): string {
 export function formatDate(dateString: string): string {
   if (!dateString) return 'N/A'
   const date = new Date(dateString)
+  if (Number.isNaN(date.getTime())) return 'N/A'
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
@@ -25,6 +26,7 @@ export function formatDate(dateString: string): string {
 export function formatDateTime(dateString: string): string {
   if (!dateString) return 'N/A'
   const date = new Date(dateString)
+  if (Number.isNaN(date.getTime())) return 'N/A'
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',

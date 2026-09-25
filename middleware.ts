@@ -40,17 +40,16 @@ export async function middleware(request: NextRequest) {
 
     const isAdminRoute = request.nextUrl.pathname.startsWith('/admin')
     const isLoginRoute = request.nextUrl.pathname === '/admin/login'
-    const hasAdminCookie = request.cookies.get('admin_authenticated')?.value === 'true'
 
-    // Admin routes require an active session or authenticated admin cookie
-    if (isAdminRoute && !isLoginRoute && !user && !hasAdminCookie) {
+    // Admin routes require an active Supabase session. No cookie bypass.
+    if (isAdminRoute && !isLoginRoute && !user) {
       const loginUrl = request.nextUrl.clone()
       loginUrl.pathname = '/admin/login'
       return NextResponse.redirect(loginUrl)
     }
 
     // If user is already logged in and visits /admin/login, redirect to dashboard
-    if (isLoginRoute && (user || hasAdminCookie)) {
+    if (isLoginRoute && user) {
       const dashboardUrl = request.nextUrl.clone()
       dashboardUrl.pathname = '/admin'
       return NextResponse.redirect(dashboardUrl)

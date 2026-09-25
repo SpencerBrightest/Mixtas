@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache'
 
 /** Fetches all products with their primary image and category name. */
 export async function getProducts() {
+  await requireAdmin()
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('products')
@@ -25,6 +26,7 @@ export async function getProducts() {
 
 /** Fetches a single product by ID with all images. */
 export async function getProductById(id: string) {
+  await requireAdmin()
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('products')

@@ -15,14 +15,16 @@ export async function requireAdmin() {
     redirect('/admin/login')
   }
 
+  const userId = user.id
+
   // Fetch profile to verify admin role permission
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from('profiles')
     .select('role')
-    .eq('id', user.id)
+    .eq('id', userId)
     .single()
 
-  if (!profile || profile.role !== 'admin') {
+  if (error || !profile || profile.role !== 'admin') {
     redirect('/')
   }
 

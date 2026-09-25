@@ -19,8 +19,13 @@ const HANDLED_EVENTS = new Set([
 /** Verifies the HMAC SHA-256 signature sent by Notch Pay. */
 function verifySignature(rawBody: string, signature: string | null) {
   if (!signature) return false
+  const secret = (process.env.NOTCHPAY_WEBHOOK_HASH || '').trim()
+  if (!secret) {
+    console.error('NotchPay webhook misconfigured: missing NOTCHPAY_WEBHOOK_HASH')
+    return false
+  }
   const expected = crypto
-    .createHmac('sha256', process.env.NOTCHPAY_WEBHOOK_HASH!)
+    .createHmac('sha256', secret)
     .update(rawBody)
     .digest('hex')
   const a = Buffer.from(expected)
@@ -95,18 +100,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true, ignored: true })
   }
 
-  // Handle duplicate webhook delivery for already successful payments
+  // Handle duplicate webhook delivery for already successful payments (idempotent: no re-apply)
   if (payment.status === 'successful') {
-    if (payment.order_id) await admin.rpc('apply_paid_order', { p_order_id: payment.order_id })
     return NextResponse.json({ received: true })
   }
 
   // Query Notch Pay API directly to verify actual transaction state
   const lookupRef = notchRef ?? payment.provider_reference ?? payment.id
+  const verifyKey = (process.env.NOTCHPAY_PRIVATE_KEY || process.env.NOTCHPAY_PUBLIC_KEY || '').trim()
+  if (!verifyKey) {
+    console.error('NotchPay webhook misconfigured: missing NOTCHPAY_PRIVATE_KEY/NOTCHPAY_PUBLIC_KEY')
+    return NextResponse.json({ error: 'Payment gateway not configured' }, { status: 500 })
+  }
   let verified: any
   try {
     const res = await fetch(`${NOTCH_API}/payments/${encodeURIComponent(lookupRef)}`, {
-      headers: { Authorization: process.env.NOTCHPAY_PUBLIC_KEY!, Accept: 'application/json' },
+      headers: { Authorization: verifyKey, Accept: 'application/json' },
     })
     if (!res.ok) throw new Error(`Notch Pay verify returned ${res.status}`)
     verified = await res.json()
@@ -118,8 +127,19 @@ export async function POST(request: Request) {
   const tx = verified?.transaction
   const status: string | undefined = tx?.status
 
+  // Preserve existing payload (checkout_url, payer info) by merging instead of overwriting.
+  const { data: existing } = await admin
+    .from('payments')
+    .select('raw_payload')
+    .eq('id', payment.id)
+    .maybeSingle()
+  const existingPayload =
+    existing?.raw_payload && typeof existing.raw_payload === 'object'
+      ? (existing.raw_payload as Record<string, unknown>)
+      : {}
+
   const base = {
-    raw_payload: body as Record<string, unknown>,
+    raw_payload: { ...existingPayload, ...body } as Record<string, unknown>,
     ...(notchRef ? { provider_reference: notchRef } : {}),
   }
 
@@ -181,6 +201,7 @@ export async function POST(request: Request) {
     .from('payments')
     .update({ ...base, status: 'successful', confirmed_at: new Date().toISOString(), note: null })
     .eq('id', payment.id)
+    .eq('status', 'pending')
 
   if (updateError) {
     console.error('Could not mark payment successful', updateError)

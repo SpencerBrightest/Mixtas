@@ -1,5 +1,8 @@
 // Plural route alias forwarding /products/[id] to the primary product detail view.
 
-import ProductPage from '@/app/product/[id]/page'
+import { redirect } from 'next/navigation'
 
-export default ProductPage
+export default async function ProductsAlias({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  redirect(`/product/${id}`)
+}

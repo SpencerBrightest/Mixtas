@@ -6,14 +6,14 @@ import { ArrowLeft, ArrowRight, Heart, Menu, Minus, Plus, Search, ShoppingBag, U
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
 import { categories, heroImage, initialCart, money, navItems, Product, products, type CartItem } from '@/lib/catalog'
 
-type StoreContextValue = { cart: CartItem[]; wishlist: string[]; addToCart: (product: Product, size?: string) => void; removeFromCart: (id: string) => void; updateQuantity: (id: string, quantity: number) => void; clearCart: () => void; toggleWishlist: (id: string) => void }
+type StoreContextValue = { cart: CartItem[]; wishlist: string[]; addToCart: (product: Product, size?: string) => void; removeFromCart: (id: string, size?: string) => void; updateQuantity: (id: string, quantity: number, size?: string) => void; clearCart: () => void; toggleWishlist: (id: string) => void }
 const StoreContext = createContext<StoreContextValue | null>(null)
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>(initialCart)
   const [wishlist, setWishlist] = useState<string[]>([])
   const addToCart = (product: Product, size?: string) => setCart((items) => { const found = items.find((item) => item.product.id === product.id && item.size === size); return found ? items.map((item) => item === found ? { ...item, quantity: item.quantity + 1 } : item) : [...items, { product, size, quantity: 1 }] })
-  const removeFromCart = (id: string) => setCart((items) => items.filter((item) => item.product.id !== id))
-  const updateQuantity = (id: string, quantity: number) => setCart((items) => items.map((item) => item.product.id === id ? { ...item, quantity: Math.max(1, quantity) } : item))
+  const removeFromCart = (id: string, size?: string) => setCart((items) => items.filter((item) => !(item.product.id === id && (size === undefined || item.size === size))))
+  const updateQuantity = (id: string, quantity: number, size?: string) => setCart((items) => items.map((item) => (item.product.id === id && (size === undefined || item.size === size)) ? { ...item, quantity: Math.max(1, quantity) } : item))
   const clearCart = () => setCart([])
   const toggleWishlist = (id: string) => setWishlist((items) => items.includes(id) ? items.filter((item) => item !== id) : [...items, id])
   return <StoreContext.Provider value={{ cart, wishlist, addToCart, removeFromCart, updateQuantity, clearCart, toggleWishlist }}>{children}</StoreContext.Provider>

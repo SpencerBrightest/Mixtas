@@ -5,21 +5,20 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Star } from 'lucide-react'
 import { Breadcrumbs, Footer, ProductActions, ProductGrid, SiteHeader } from '@/components/store'
-import { getProduct as getCatalogProduct, money, relatedProducts, products as staticProducts, Product } from '@/lib/catalog'
+import { getProduct as getCatalogProduct, money, relatedProducts, products as staticProducts, type Product } from '@/lib/catalog'
 import { supabasePublic } from '@/lib/supabase/public'
 import { ProductJsonLd } from '@/components/seo/product-json-ld'
 
 /** Fetches product details from Supabase or catalog fallback. */
 async function fetchProduct(idOrSlug: string): Promise<Product | null> {
   // 1. Check local catalog products first
-  const staticFound = staticProducts.find(
-    (p) => p.id === idOrSlug || p.name.toLowerCase().replace(/\s+/g, '-') === idOrSlug
-  )
+  const staticFound =
+    staticProducts.find((p) => p.id === idOrSlug) ?? getCatalogProduct(idOrSlug) ?? null
   if (staticFound) return staticFound
 
   // 2. Query Supabase database
   try {
-    const isUuid = idOrSlug.length === 36 && idOrSlug.includes('-')
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug)
     const query = supabasePublic
       .from('products')
       .select('*, categories(name), product_images(url, is_primary)')
@@ -30,7 +29,8 @@ async function fetchProduct(idOrSlug: string): Promise<Product | null> {
       : await query.eq('slug', idOrSlug).maybeSingle()
 
     if (data) {
-      const primaryImage = data.product_images?.find((img: any) => img.is_primary)?.url || data.product_images?.[0]?.url || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=85'
+      const images = (data.product_images as { url?: string; is_primary?: boolean }[] | null) ?? []
+      const primaryImage = images.find((img) => img.is_primary)?.url || images[0]?.url || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=85'
       return {
         id: data.id,
         name: data.name,
@@ -47,8 +47,8 @@ async function fetchProduct(idOrSlug: string): Promise<Product | null> {
     console.warn('Supabase product query notice:', error)
   }
 
-  // Fallback to first static catalog product if valid fallback
-  return getCatalogProduct(idOrSlug)
+  // Unknown id/slug: return null so the route renders a 404 instead of an unrelated product.
+  return null
 }
 
 /** Renders the product detail view. */

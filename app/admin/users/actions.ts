@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache'
 
 /** Fetches all user profiles with order counts and total spend. */
 export async function getUsers() {
+  await requireAdmin()
   const supabase = await createClient()
   const { data: profiles, error } = await supabase
     .from('profiles')
@@ -49,6 +50,7 @@ export async function getUsers() {
 
 /** Fetches a single user profile by ID with their orders and payments. */
 export async function getUserById(id: string) {
+  await requireAdmin()
   const supabase = await createClient()
 
   const { data: profile, error } = await supabase

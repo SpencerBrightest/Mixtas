@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache'
 
 /** Fetches all orders with their items and linked payment status. */
 export async function getOrders() {
+  await requireAdmin()
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('orders')
@@ -26,6 +27,7 @@ export async function getOrders() {
 
 /** Fetches a single order by ID with full item and payment details. */
 export async function getOrderById(id: string) {
+  await requireAdmin()
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('orders')

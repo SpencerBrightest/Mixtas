@@ -61,14 +61,19 @@ export async function startNotchPayment(paymentId: string): Promise<StartResult>
     customer.phone = `+237${cleanPhone}`
   }
 
-  const site = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || '').trim() || 'http://localhost:3000'
+
+  const apiKey = (process.env.NOTCHPAY_PRIVATE_KEY || process.env.NOTCHPAY_PUBLIC_KEY || '').trim()
+  if (!apiKey) {
+    return { ok: false, error: 'Payment gateway is not configured. Please contact support.' }
+  }
 
   let res: Response
   try {
     res = await fetch(`${NOTCH_API}/payments`, {
       method: 'POST',
       headers: {
-        Authorization: process.env.NOTCHPAY_PUBLIC_KEY!,
+        Authorization: apiKey,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },

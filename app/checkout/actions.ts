@@ -64,13 +64,19 @@ export async function placeOrder(input: CheckoutInput) {
     }
   }
 
-  // 2. Insert order record using admin client to bypass RLS
+  // 2. Never trust the client total: recompute from items + shipping rule.
+  const subtotal = validated.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const shipping = subtotal >= 50000 || subtotal === 0 ? 0 : 2500
+  const computedTotal = subtotal + shipping
+  const total = computedTotal
+
+  // 3. Insert order record using admin client to bypass RLS
   const { data: order, error: orderError } = await admin
     .from('orders')
     .insert({
       user_id: userId,
       status: 'pending',
-      total: validated.total,
+      total,
       currency: 'XAF',
       customer_name: validated.customerName,
       customer_phone: validated.customerPhone,
@@ -97,6 +103,8 @@ export async function placeOrder(input: CheckoutInput) {
   const { error: itemsError } = await admin.from('order_items').insert(orderItemsData)
   if (itemsError) {
     console.error('Order items error:', itemsError)
+    await admin.from('orders').delete().eq('id', order.id)
+    return { ok: false, error: 'Could not create order items. Please try again.' }
   }
 
   // 5. Create initial payment row using admin client to bypass missing insert policy
@@ -106,7 +114,7 @@ export async function placeOrder(input: CheckoutInput) {
     order_id: order.id,
     user_id: userId,
     provider: validated.provider || 'notchpay',
-    amount: Math.round(validated.total),
+    amount: Math.round(total),
     currency: 'XAF',
     status: 'pending',
     payer_phone: validated.momoNumber || validated.customerPhone,
@@ -146,6 +154,8 @@ export async function placeOrder(input: CheckoutInput) {
   }
 
   if (!paymentRecord?.id) {
+    await admin.from('order_items').delete().eq('order_id', order.id)
+    await admin.from('orders').delete().eq('id', order.id)
     return {
       ok: false,
       error: payErr?.message || 'Could not initialize payment record in database.',
@@ -162,6 +172,6 @@ export async function placeOrder(input: CheckoutInput) {
     orderId: order.id,
     orderNumber: order.order_number || 1001,
     paymentId: paymentRecord.id,
-    total: validated.total,
+    total,
   }
 }

@@ -498,34 +498,187 @@ export function AccountPage() {
   )
 }
 
-/** Renders the brand editorial and journal blog posts. */
+/** Renders the brand editorial and journal blog posts with in-depth item breakdowns and direct shop links. */
 export function BlogPage() {
+  const featuredPost = blogPosts[0]
+  const otherPosts = blogPosts.slice(1)
+  const editorialProducts = products.slice(0, 6)
+
   return (
     <>
       <SiteHeader />
       <main className="page-shell">
+        {/* Page Intro */}
         <div className="page-intro">
-          <p className="eyebrow">From the studio</p>
-          <h1>Journal</h1>
-          <p>Stories about style, materials, and making space for the good things.</p>
+          <p className="eyebrow">The Mixtas Journal</p>
+          <h1>Style &amp; Wardrobe Notes</h1>
+          <p className="max-w-2xl mx-auto">
+            In-depth guides on our signature pieces, fabric craftsmanship, fit recommendations, and considered styling for modern movement.
+          </p>
         </div>
-        <div className="blog-grid">
-          {blogPosts.map((post) => (
-            <article className="blog-card" key={post.slug}>
-              <Link href={`/blog/${post.slug}`}>
-                <img src={post.image} alt={post.title} />
-              </Link>
-              <p className="eyebrow">{post.category} &middot; {post.date}</p>
-              <h2>
-                <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+
+        {/* Hero Spotlight Story */}
+        <section className="mb-16 bg-[#faf8f5] rounded-2xl border border-[#dedfdd] overflow-hidden grid grid-cols-1 lg:grid-cols-12 shadow-xs">
+          <div className="lg:col-span-7 relative min-h-[340px] sm:min-h-[440px]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={featuredPost.image}
+              alt={featuredPost.title}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          </div>
+          <div className="lg:col-span-5 p-8 sm:p-12 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-3 text-xs uppercase tracking-wider font-semibold text-[#5d85a0] mb-3">
+                <span>{featuredPost.category}</span>
+                <span>&middot;</span>
+                <span>{featuredPost.readTime}</span>
+              </div>
+              <h2 className="font-serif text-2xl sm:text-3xl text-[#182938] leading-snug mb-4">
+                <Link href={`/blog/${featuredPost.slug}`} className="hover:text-[#5d85a0] transition-colors">
+                  {featuredPost.title}
+                </Link>
               </h2>
-              <p>{post.excerpt}</p>
-              <Link href={`/blog/${post.slug}`} className="text-link">
-                Read story <ArrowRight size={14} />
+              <p className="text-sm text-[#727677] leading-relaxed mb-6">
+                {featuredPost.excerpt}
+              </p>
+
+              {/* Items Mentioned Preview */}
+              <div className="bg-white p-4 rounded-xl border border-[#dedfdd] mb-6 space-y-2">
+                <p className="text-xs uppercase tracking-wider font-bold text-[#182938]">Key Pieces Featured:</p>
+                <ul className="text-xs text-[#727677] space-y-1">
+                  <li>&bull; <strong>Structured Double-Breasted Trench</strong> &middot; 65 000 FCFA</li>
+                  <li>&bull; <strong>Oversized Silk Crepe Blouse</strong> &middot; 28 000 FCFA</li>
+                  <li>&bull; <strong>Full-Grain Leather Oxford Derbies</strong> &middot; 48 000 FCFA</li>
+                  <li>&bull; <strong>Studio Shoulder Bag</strong> &middot; 55 000 FCFA</li>
+                </ul>
+              </div>
+            </div>
+
+            <div>
+              <Link href={`/blog/${featuredPost.slug}`} className="button button-dark inline-flex items-center gap-2">
+                Read Full Editorial <ArrowRight size={15} />
               </Link>
-            </article>
-          ))}
-        </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Detailed Articles Grid */}
+        <section className="mb-16">
+          <div className="section-heading left mb-8">
+            <p className="eyebrow">Explore all stories</p>
+            <h2>Collection Guides &amp; Craft Notes</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {otherPosts.map((post) => (
+              <article key={post.slug} className="blog-card bg-white rounded-xl border border-[#dedfdd] overflow-hidden flex flex-col justify-between shadow-2xs hover:shadow-sm transition-all">
+                <div>
+                  <Link href={`/blog/${post.slug}`} className="block relative aspect-16/10 overflow-hidden bg-[#f4f3f0]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={post.image}
+                      alt={post.title}
+                      className="w-full h-full object-cover hover:scale-103 transition-transform duration-500"
+                    />
+                  </Link>
+                  <div className="p-6">
+                    <div className="flex items-center gap-2 text-xs uppercase tracking-wider font-semibold text-[#5d85a0] mb-2">
+                      <span>{post.category}</span>
+                      <span>&middot;</span>
+                      <span>{post.readTime}</span>
+                    </div>
+                    <h3 className="font-serif text-xl text-[#182938] mb-3 leading-snug">
+                      <Link href={`/blog/${post.slug}`} className="hover:text-[#5d85a0] transition-colors">
+                        {post.title}
+                      </Link>
+                    </h3>
+                    <p className="text-xs text-[#727677] leading-relaxed mb-4">
+                      {post.excerpt}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="px-6 pb-6 pt-0 border-t border-[#dedfdd]/60 flex items-center justify-between">
+                  <span className="text-[11px] text-[#727677]">{post.date}</span>
+                  <Link href={`/blog/${post.slug}`} className="text-link text-xs font-semibold">
+                    Read article <ArrowRight size={13} />
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        {/* Featured In The Journal - Direct Shop Lookbook */}
+        <section className="mb-16 bg-[#faf8f5] p-8 sm:p-12 rounded-2xl border border-[#dedfdd]">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 pb-4 border-b border-[#dedfdd]">
+            <div>
+              <p className="eyebrow">Shop the editorial</p>
+              <h2 className="font-serif text-2xl sm:text-3xl text-[#182938]">Pieces Mentioned in the Journal</h2>
+            </div>
+            <Link href="/shop" className="text-link text-xs font-semibold mt-2 sm:mt-0">
+              View All 20 Collection Pieces <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {editorialProducts.map((product) => (
+              <div key={product.id} className="bg-white rounded-xl border border-[#dedfdd] p-3 flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+                <Link href={`/product/${product.id}`} className="block aspect-square rounded-lg overflow-hidden bg-[#f4f3f0] mb-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={product.image} alt={product.name} className="w-full h-full object-cover hover:scale-105 transition-transform" />
+                </Link>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-[#5d85a0] font-semibold">{product.category}</p>
+                  <h4 className="text-xs font-medium text-[#182938] line-clamp-1 mt-0.5">{product.name}</h4>
+                  <p className="font-serif font-bold text-xs text-[#182938] mt-1">{money(product.price)}</p>
+                </div>
+                <Link href={`/product/${product.id}`} className="mt-3 text-[11px] font-semibold text-[#182938] bg-[#f4f3f0] hover:bg-[#dedfdd] text-center py-1.5 rounded transition-colors">
+                  View Piece
+                </Link>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Fabric & Craftsmanship Philosophy */}
+        <section className="bg-white p-8 sm:p-12 rounded-2xl border border-[#dedfdd] mb-12">
+          <div className="max-w-3xl mx-auto text-center space-y-4 mb-10">
+            <p className="eyebrow">The Standards We Keep</p>
+            <h2 className="font-serif text-3xl text-[#182938]">Craftsmanship, Sourcing &amp; Longevity</h2>
+            <p className="text-sm text-[#727677] leading-relaxed">
+              Every item in our catalogue is chosen with longevity in mind. We collaborate directly with textile mills that specialize in organic natural fibers, unadulterated leathers, and robust construction.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
+            <div className="p-5 rounded-xl bg-[#faf8f5] border border-[#dedfdd] space-y-2">
+              <h3 className="font-serif font-bold text-base text-[#182938]">Mulberry Silk</h3>
+              <p className="text-xs text-[#727677] leading-relaxed">
+                Hypoallergenic, breathable, and temperature-regulating. Woven in a matte crepe finish for effortless drape.
+              </p>
+            </div>
+            <div className="p-5 rounded-xl bg-[#faf8f5] border border-[#dedfdd] space-y-2">
+              <h3 className="font-serif font-bold text-base text-[#182938]">Full-Grain Calfskin</h3>
+              <p className="text-xs text-[#727677] leading-relaxed">
+                Vegetable-tanned and Goodyear-welted. Develops a rich organic patina and molds to your step over time.
+              </p>
+            </div>
+            <div className="p-5 rounded-xl bg-[#faf8f5] border border-[#dedfdd] space-y-2">
+              <h3 className="font-serif font-bold text-base text-[#182938]">European Flax Linen</h3>
+              <p className="text-xs text-[#727677] leading-relaxed">
+                Spun from heavyweight natural flax. Keeps you cool under sunlight and softens with each wash.
+              </p>
+            </div>
+            <div className="p-5 rounded-xl bg-[#faf8f5] border border-[#dedfdd] space-y-2">
+              <h3 className="font-serif font-bold text-base text-[#182938]">French Terry Fleece</h3>
+              <p className="text-xs text-[#727677] leading-relaxed">
+                Heavyweight 460 GSM cotton fleece. Pre-shrunk and double-stitched for enduring boxy silhouette.
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
       <Footer />
     </>

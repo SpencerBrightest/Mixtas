@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache'
 
 /** Fetches all payment records with linked order and user details. */
 export async function getPayments() {
+  await requireAdmin()
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('payments')
@@ -25,6 +26,7 @@ export async function getPayments() {
 
 /** Fetches a single payment by ID with full details including raw payload. */
 export async function getPaymentById(id: string) {
+  await requireAdmin()
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('payments')
@@ -92,6 +94,7 @@ export async function confirmPaymentManually(paymentId: string) {
 
 /** Fetches summary statistics for the payments overview section. */
 export async function getPaymentStats() {
+  await requireAdmin()
   const supabase = await createClient()
 
   // Total successful payments this month

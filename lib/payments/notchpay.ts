@@ -1,6 +1,6 @@
 // Server-side integration with NotchPay API for Mobile Money and card transaction processing.
 
-'server-only'
+import 'server-only'
 
 interface NotchPayInitInput {
   amount: number
@@ -29,12 +29,11 @@ export async function initializeNotchPayPayment(
 
   const apiKey = privateKey || publicKey
 
-  if (!apiKey || apiKey.startsWith('your_')) {
-    console.warn('NotchPay API key not configured in .env, falling back to simulated checkout.')
+  if (!apiKey || apiKey.startsWith('your_') || apiKey.includes('xxxxxxxx')) {
+    console.warn('NotchPay API key not configured in .env.')
     return {
-      success: true,
-      transactionReference: `NOTCH-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      authorizationUrl: undefined,
+      success: false,
+      error: 'Payment gateway is not configured. Set NOTCHPAY_PRIVATE_KEY.',
     }
   }
 

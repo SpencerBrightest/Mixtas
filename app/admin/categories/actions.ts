@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache'
 
 /** Fetches all categories with their product counts. */
 export async function getCategories() {
+  await requireAdmin()
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('categories')

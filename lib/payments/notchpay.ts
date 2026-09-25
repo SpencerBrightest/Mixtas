@@ -24,16 +24,14 @@ export interface NotchPayInitResult {
 export async function initializeNotchPayPayment(
   input: NotchPayInitInput
 ): Promise<NotchPayInitResult> {
-  const publicKey = (process.env.NOTCHPAY_PUBLIC_KEY || '').trim()
-  const privateKey = (process.env.NOTCHPAY_PRIVATE_KEY || '').trim()
-
-  const apiKey = privateKey || publicKey
+  // NotchPay authenticates payment init with the PUBLIC key (pk_) in Authorization.
+  const apiKey = (process.env.NOTCHPAY_PUBLIC_KEY || '').trim()
 
   if (!apiKey || apiKey.startsWith('your_') || apiKey.includes('xxxxxxxx')) {
     console.warn('NotchPay API key not configured in .env.')
     return {
       success: false,
-      error: 'Payment gateway is not configured. Set NOTCHPAY_PRIVATE_KEY.',
+      error: 'Payment gateway is not configured. Set NOTCHPAY_PUBLIC_KEY.',
     }
   }
 

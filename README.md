@@ -132,8 +132,8 @@ Apply DB:
 | `NEXT_PUBLIC_SUPABASE_URL` | public | yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | public | yes | Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | server | yes | Service-role (admin client, webhooks, order writes). Never `NEXT_PUBLIC_` |
-| `NOTCHPAY_PRIVATE_KEY` | server | yes (prod) | Preferred for API calls |
-| `NOTCHPAY_PUBLIC_KEY` | server | fallback | Fallback if private missing |
+| `NOTCHPAY_PUBLIC_KEY` | server | yes | Used in `Authorization` header for init + verify (per NotchPay docs) |
+| `NOTCHPAY_PRIVATE_KEY` | server | optional | Reserved for advanced/X-Grant server ops; never sent in `Authorization` here |
 | `NOTCHPAY_WEBHOOK_HASH` | server | yes | HMAC secret for webhook verification |
 
 See `.env.example` for placeholders. Never commit `.env`.

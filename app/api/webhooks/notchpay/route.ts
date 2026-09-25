@@ -105,11 +105,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true })
   }
 
-  // Query Notch Pay API directly to verify actual transaction state
+  // Query Notch Pay API directly to verify actual transaction state.
+  // Verification uses the PUBLIC key in Authorization (per NotchPay docs).
   const lookupRef = notchRef ?? payment.provider_reference ?? payment.id
-  const verifyKey = (process.env.NOTCHPAY_PRIVATE_KEY || process.env.NOTCHPAY_PUBLIC_KEY || '').trim()
-  if (!verifyKey) {
-    console.error('NotchPay webhook misconfigured: missing NOTCHPAY_PRIVATE_KEY/NOTCHPAY_PUBLIC_KEY')
+  const verifyKey = (process.env.NOTCHPAY_PUBLIC_KEY || '').trim()
+  if (!verifyKey || verifyKey.startsWith('your_') || verifyKey.includes('xxxxxxxx')) {
+    console.error('NotchPay webhook misconfigured: missing or placeholder NOTCHPAY_PUBLIC_KEY')
     return NextResponse.json({ error: 'Payment gateway not configured' }, { status: 500 })
   }
   let verified: any

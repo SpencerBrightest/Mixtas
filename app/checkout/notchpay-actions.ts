@@ -7,6 +7,14 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 const NOTCH_API = 'https://api.notchpay.co'
 
+/** Detects unset/placeholder keys (example values, masked dashboard exports) the API would reject with 401. */
+function isPlaceholderKey(key: string) {
+  const v = key.trim()
+  return (
+    !v || v.startsWith('your_') || v.includes('xxxxxxxx') || /^[*]+$/.test(v.replace(/\s+/g, ''))
+  )
+}
+
 type StartResult = { ok: true; url: string } | { ok: false; error: string }
 
 /** Starts a payment transaction with Notch Pay REST API and stores the checkout authorization URL. */
@@ -63,8 +71,11 @@ export async function startNotchPayment(paymentId: string): Promise<StartResult>
 
   const site = (process.env.NEXT_PUBLIC_SITE_URL || '').trim() || 'http://localhost:3000'
 
-  const apiKey = (process.env.NOTCHPAY_PRIVATE_KEY || process.env.NOTCHPAY_PUBLIC_KEY || '').trim()
-  if (!apiKey) {
+  // NotchPay authenticates POST /payments with the PUBLIC key (pk_). The private
+  // key (sk_) is for sensitive server ops / X-Grant flows, not Authorization here.
+  const apiKey = (process.env.NOTCHPAY_PUBLIC_KEY || '').trim()
+  if (!apiKey || isPlaceholderKey(apiKey)) {
+    console.error('NotchPay misconfigured: missing or placeholder NOTCHPAY_PUBLIC_KEY.')
     return { ok: false, error: 'Payment gateway is not configured. Please contact support.' }
   }
 
@@ -103,6 +114,11 @@ export async function startNotchPayment(paymentId: string): Promise<StartResult>
     const againPayload = (again?.raw_payload as Record<string, any>) || {}
     if (againPayload?.checkout_url) return { ok: true, url: againPayload.checkout_url }
     return { ok: false, error: 'Your payment is already being set up. Please wait a moment and refresh.' }
+  }
+
+  if (res.status === 401) {
+    console.error('Notch Pay init failed: 401 invalid API credentials. Check NOTCHPAY_PUBLIC_KEY (test vs live, revoked?).')
+    return { ok: false, error: 'Payment gateway rejected our API credentials. Please contact support (code 401).' }
   }
 
   if (!res.ok || !data?.authorization_url) {
